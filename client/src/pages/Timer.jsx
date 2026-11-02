@@ -1,0 +1,21 @@
+import { useEffect, useRef, useState } from 'react'; import { api } from '../api';
+export default function Timer() {
+    const [focus, setFocus] = useState(25); const [breakTime, setBreakTime] = useState(5);
+    const [remaining, setRemaining] = useState(1500);
+    const [running, setRunning] = useState(false);
+    const [mode, setMode] = useState('Focus session');
+    const [sessions, setSessions] = useState(0);
+    const [showSettings, setShowSettings] = useState(false);
+    const [theme, setTheme] = useState('stars');
+    const [error, setError] = useState('');
+    const completedRef = useRef(false);
+    useEffect(() => { if (!running) return; const id = setInterval(() => setRemaining(value => { if (value <= 1) { setRunning(false); if (mode === 'Focus session' && !completedRef.current) { completedRef.current = true; setSessions(n => n + 1); api('/sessions', { method: 'POST', body: JSON.stringify({ minutes: focus }) }).catch(e => setError(e.message)) } return 0 } return value - 1 }), 1000); return () => clearInterval(id) }, [running, mode, focus]);
+
+    function start() { if (remaining === 0) { completedRef.current = false; setRemaining((mode === 'Focus session' ? focus : breakTime) * 60) } setRunning(true) }
+    function reset() { setRunning(false); completedRef.current = false; setRemaining((mode === 'Focus session' ? focus : breakTime) * 60) }
+    function changeMode(next) { setRunning(false); completedRef.current = false; setMode(next); setRemaining((next === 'Focus session' ? focus : breakTime) * 60) }
+    function saveSettings() { const f = Number(focus); const b = Number(breakTime); if (!Number.isInteger(f) || !Number.isInteger(b) || f < 1 || b < 1 || f > 180 || b > 60) { setError('Focus must be 1–180 minutes and break 1–60 minutes.'); return } setError(''); setRunning(false); setRemaining((mode === 'Focus session' ? f : b) * 60); setShowSettings(false) }
+    const display = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
+    return <div className={`timer-page theme-${theme}`}><div className="timer-card"><div className="timer-header"><div><p className="eyebrow">MAKE SPACE TO FOCUS</p><h1>Focus Timer</h1></div><button className="settings-trigger" onClick={() => setShowSettings(true)} aria-label="Timer settings">⚙</button></div><div className="timer-tabs"><button className={mode === 'Focus session' ? 'selected' : ''} onClick={() => changeMode('Focus session')}>Focus</button><button className={mode === 'Break' ? 'selected' : ''} onClick={() => changeMode('Break')}>Break</button></div><div className="timer-digits" aria-live="polite">{display}</div><p className="timer-mode">{mode} · {mode === 'Focus session' ? focus : breakTime} minutes</p><p className="session-count">Completed focus sessions: <b>{sessions}</b></p><div className="timer-controls"><button className="btn btn-primary" onClick={start}>{running ? 'Running...' : 'Start'}</button><button className="btn btn-quiet" onClick={() => setRunning(false)}>Pause</button><button className="btn btn-quiet" onClick={reset}>Reset</button></div>{error && <p className="error-text">{error}</p>}<p className="timer-tip">One focused session at a time. You have got this.</p></div>
+        {showSettings && <div className="modal-backdrop"><section className="modal-card"><div className="panel-heading"><div><p className="eyebrow">PERSONALIZE</p><h2>Timer settings</h2></div><button className="close-btn" onClick={() => setShowSettings(false)}>×</button></div><label>Focus time (minutes)<input type="number" min="1" max="180" value={focus} onChange={e => setFocus(e.target.value)} /></label><label>Break time (minutes)<input type="number" min="1" max="60" value={breakTime} onChange={e => setBreakTime(e.target.value)} /></label><label>Background theme<select value={theme} onChange={e => setTheme(e.target.value)}><option value="stars">Night sky</option><option value="ocean">Ocean</option></select></label>{error && <p className="error-text">{error}</p>}<div className="modal-actions"><button className="btn btn-quiet" onClick={() => setShowSettings(false)}>Cancel</button><button className="btn btn-primary" onClick={saveSettings}>Save settings</button></div></section></div>}</div>;
+}
